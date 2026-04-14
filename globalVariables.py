@@ -1,0 +1,2 @@
+MASKWIDTH=3 
+HASHSIZE=256 # must be 2^n
