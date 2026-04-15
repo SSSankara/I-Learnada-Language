@@ -21,12 +21,12 @@ def stateAppend(state, string):
     return(state)
 
 def combine(d1,d2):
-    h1,l1=d1
-    h2,l2=d2
-    return (
+    [h1,l1]=d1
+    [h2,l2]=d2
+    return [
         rotate(h1, l2 * 5) ^ h2,
         l1 + l2
-    )
+    ]
 
 def stateCombine(data):
     out=data[0]
