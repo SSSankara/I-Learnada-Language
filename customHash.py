@@ -1,6 +1,7 @@
 import time
 from globalVariables import HASHSIZE
 
+
 MASK=(1<<HASHSIZE)-1 #
 CONST = int((2**HASHSIZE) * ((1 + 5**0.5) / 2)) & MASK
 def rotate(x,r):

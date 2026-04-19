@@ -1,0 +1,30 @@
+#+title: Structure
+* DAG
+{ hash :
+        { index : #location/index of node
+                {
+                "links": [ [ hash, location ] ]#preceding nodes
+                "mask": #how to apply the raw substrings
+                "raw": [ [ substring, hash, length ] ]# parts
+                "round": #round it was found
+                }
+        }
+}
+* Patterns
+{ hash :
+        { subhash : # sum of parts (same as hash if one part)
+                {
+                "f": #frequency of usages
+                "score": #importance
+                "round": #what itteration it came from
+                "raw": [ [ substring, hash, length ] ]# parts
+                }
+
+        }
+}
+
+* DAG
+** DAG=initialiseDAG(sentence)
+create a DAG from begining to end of a sentence where each character is a node
+** expandDAG(DAG,hashes)
+recursively loop through DAG by mask
