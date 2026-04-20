@@ -56,7 +56,7 @@ if __name__=="__main__":
             count+=1
             if not count%2000:
                 percentage=100*count//total
-                print(f"{count} out of {total} ({percentage}%), time: {time.perf_counter()-start}"+" "*53)
+                print(f"{count} out of {total} ({percentage}%), time left: {(time.time()-start)*(len(sentences)-count)/len(sentences)}"+" "*53)
             DAG=initialiseDAG(sentence)
             DAG=expandDAG(DAG,hashes,expand=True,expRound=itterations-i)
             #for h,d in extractPatterns(DAG,r=itterations-1,raw=True).items():

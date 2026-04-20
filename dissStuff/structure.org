@@ -28,3 +28,6 @@
 create a DAG from begining to end of a sentence where each character is a node
 ** expandDAG(DAG,hashes)
 recursively loop through DAG by mask
+
+** Database and idf clause
+** idf weighted jaccard:w

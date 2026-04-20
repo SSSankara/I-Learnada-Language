@@ -1,0 +1,80 @@
+#+title: Dissertation
+* project outline and spec
+* Title
+core cs problem being solved. Expansion
+Spatially Propagated Spaced Repetition over a Linguistic Similarity Graph for Language Learning
+* summary
+- one page
+- Concise statement of the problem you intended to solve and main achievements
+* Acknowledgements
+- THIS page should contain any acknowledgements to those who have assisted with your work.
+* table of contents
+* 1 Introduciton and background research
+- [ ] Project aim and context explained at a level suitable for non experts.
+- [ ] Evidence of a systematic and scholarly approach to background research and relevant literature review.
+- [ ] Critical analysis of existing solutions and techniques. Depending on the nature of the project, could also include:
+  - [ ] An empirical study to clarify context.
+  - [ ] Requirements and risk analysis, possibly from an external stakeholder
+- rubric
+  - [ ] thorough and extensive litarature review
+  - [ ] Introcuction, explanation of context, analysis of existing solutions
+* 2 Methodology
+ - [ ] Design of the solution, supported by justification of choices made.
+ - [ ] Evidence that software was properly managed using a version control system, and followed standard good practice in design and structure. Depending on the nature of the project, could also include:
+   - [ ] Evidence of data collection and preparation.
+   - [ ] Schematic diagrams and description of overall software architecture
+   - [ ] Details of the project management approach that was used, eg. sprints
+ - rubric
+   - [ ] Outstanding justificaiton of design choices in context of project requirements
+   - [ ] Effective and proper use of all tools eg version control
+* 3 Implementation and validation
+- [ ] Implementation, with evidence of appropriate validation and testing
+- [ ] Depending on the nature of the project, could include:
+  - [ ] Detailed description of software implementation, with justifications.
+  - [ ] Software validation, e.g. unit tests, reproduction of known results etc.
+  - [ ] Derivation of theoretical proofs, reproduction of known results etc.
+- rubric
+  - [ ] significant challenge and goals competently achieved
+* 4 Results, Evaluation, discussion
+- [ ] Appropriate technical and/or user evaluation.
+- [ ] Results clearly related to aim and motivation/goals as appropriate.
+- [ ] Quantified outcomes of the study and ideas for future work.
+- [ ] Depending on the nature of the project, could include:
+  - [ ] Performance/complexity/accuracy analysis and interpretation.
+  - [ ] Results and discussion of user evaluation questionnaires.
+  - [ ] Evaluation of computational models against theoretical results
+- rubric
+  - [ ] Thorough comprehensive evaluation
+  - [ ] Results understood in context of aim and problem domain
+  - [ ] excelent detailed ideas for future work
+* references
+*
+* Appendix A
+- rubric
+  - [ ] Excelent discussion of project process, personal reflection, lesons learnt
+  - [ ] thorough discusison of legal, social, professional, ethical issues, including explanations if not relevant
+** Critical self-evaluation
+- [ ] A critical self-evaluation of the project process, including personal reflection and lessons learned.
+** Personal reflection and lessons learnt
+- [ ] Discussion of legal,social, ethical and professional aspects.
+** Legal, ethical, social, professional issues
+- [ ] each must be addressed, justify why not if not
+https://www.bcs.org/media/2211/bcs-code-of-conduct.pdf
+- [ ] Sensetive use of religious texts
+- [ ] copyrighted data, scripts, corpuses
+* Appendix B: External materials
+this appendix should provide a brief record of materials used in the solution that are not
+the student's own work. Such materials might be pieces of codes made available from a
+research group/company or from the internet, datasets prepared by external users or any
+preliminary materials/drafts/notes provided by a supervisor. It should be clear what was used
+as ready
+-
+made components and what was developed as part of the project. This appendix
+should be included even if no external materials were used, in which case a statement to
+that effect is all that is required.
+** python libraries
+* Presentation marks
+- [ ] structure inc appendices
+- [ ] clarity of writing
+- [ ] exceptional use of display items
+- [ ] Citations correctly formatted
