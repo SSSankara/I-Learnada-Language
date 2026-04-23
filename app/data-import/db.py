@@ -51,7 +51,13 @@ def create_db(path):
         stability   REAL NOT NULL DEFAULT 0.1,
         activation  REAL NOT NULL DEFAULT 0.1,
         last_event_time REAL NOT NULL,
+        session_id  INTEGER,
         PRIMARY KEY (learner_id, sentence_id)
+    );
+    CREATE TABLE IF NOT EXISTS sessions (
+        session_id  INTEGER PRIMARY KEY AUTOINCREMENT,
+        learner_id  INTEGER NOT NULL REFERENCES learners(learner_id),
+        started_at  REAL NOT NULL
     );
 
     CREATE INDEX IF NOT EXISTS idx_sp_sentence
@@ -76,19 +82,19 @@ def timeleft(start, count, length):
 
 
 if __name__=="__main__":
-    with open("data/pinru/subs","r") as f:
+    with open("../../assets/pinru/subs","r") as f:
         corpus=f.readlines()
     with open("pinru.pkl","rb") as f:
         hashes=pickle.load(f)
-    #with open("data/eng_newscrawl_/eng_newscrawl_2018_10K-sentences.txt","r") as f:
+    #with open("../../assets/eng_newscrawl_/eng_newscrawl_2018_10K-sentences.txt","r") as f:
     #   corpus=[line.split('\t')[1] for line in f.readlines()]
     #with open("hashish.pkl","rb") as f:
     #    hashes=pickle.load(f)
-    #with open("data/quran","r") as f:
+    #with open("../../assets/quran","r") as f:
     #    corpus=f.readlines()
     #with open("quran.pkl","rb") as f:
     #    hashes=pickle.load(f)
-    conn = create_db("pin2.db")
+    conn = create_db("../../data/pin2.db")
     cur=conn.cursor()
 
     start=time.time()
@@ -218,14 +224,4 @@ if __name__=="__main__":
 
 
 
-
-
-else: 
-    #filename="pinru"
-    filename="hashish"
-    #filename="quran"
-    with open(f"{filename}.pkl", "wb") as f:
-        pickle.dump(hashes, f)
-    with open(f"{filename}.json", "w") as f:
-        json.dump(hashes, f, indent=2)
 

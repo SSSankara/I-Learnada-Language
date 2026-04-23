@@ -31,3 +31,16 @@ recursively loop through DAG by mask
 
 ** Database and idf clause
 ** idf weighted jaccard:w
+
+* Session
+** QGraph
+*** find review candidates
+- sentences with activations and neighbour activations under a threshold
+*** add new candidates
+- sentences with generally comfortable cards and 1-2 new patterns
+*** populate
+- find minimum stable paths to new and reviews that include all involved known patterns for context
+*** next
+- figure out which card to show next depending on session state.
+*** update node
+- give a right or wrong for a node, if wrong add to see later and

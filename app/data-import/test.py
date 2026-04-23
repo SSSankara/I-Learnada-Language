@@ -32,7 +32,7 @@ def freqFilter(patterns,boolFunction):
 
 
 if __name__=="__main__":
-    with open("data/englishTestCorpus/eng-uk_web_2002_10K-sentences.txt","r") as f:
+    with open("../../assets/englishTestCorpus/eng-uk_web_2002_10K-sentences.txt","r") as f:
         corpus=[line.split('\t')[1] for line in f.readlines()]
     hashes=defaultdict(lambda: defaultdict(lambda: {"f":0,"raw":""}))
 

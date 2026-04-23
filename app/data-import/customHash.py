@@ -51,7 +51,7 @@ def stateAppendRaw(state, data):
 
 ##test hashing function
 if __name__=="__main__":
-    #with open("data/tur-tr_web_2019_300K/tur-tr_web_2019_300K-sentences.txt","r") as f:
+    #with open("../../assets/tur-tr_web_2019_300K/tur-tr_web_2019_300K-sentences.txt","r") as f:
     #    sentences=f.readlines()
     ##sentence=input("gib sebtens:\n")
    

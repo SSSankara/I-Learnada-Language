@@ -1,10 +1,12 @@
 from DAG2 import initialiseDAG, expandDAG, extractPatterns
+from customHash import stateAppend
 import matplotlib.pyplot as plt
 import numpy as np
 from collections import defaultdict
 import json
 import pickle
 import time
+import jieba
 
 def patternFreqs(patterns):
     freqs = []
@@ -30,17 +32,97 @@ def freqFilter(patterns,boolFunction):
 
 
 if __name__=="__main__":
-    with open("data/pinru/subs","r") as f:
+    with open("../../assets/pinru/subs","r") as f:
         corpus=f.readlines()
-    #with open("data/eng_newscrawl_2018_10K/eng_newscrawl_2018_10K-sentences.txt","r") as f:
+    with open("pinru.pkl","rb") as f:
+        hashes=pickle.load(f)
+    #with open("../../assets/eng_newscrawl_2018_10K/eng_newscrawl_2018_10K-sentences.txt","r") as f:
     #   corpus=[line.split('\t')[1] for line in f.readlines()]
-    #with open("data/quran","r") as f:
+    #with open("hashish.pkl","rb") as f:
+    #    hashes=pickle.load(f)
+    #with open("../../assets/quran","r") as f:
     #    corpus=f.readlines()
+    #with open("quran.pkl","rb") as f:
+    #    hashes=pickle.load(f)
     #hashes=defaultdict(lambda: defaultdict(lambda: {"f":0,"raw":""}))
-    hashes={}
+    #hashes={}
+    words=defaultdict(lambda: 0)
+    for line in corpus:
+        for word in jieba.cut(line):#.split(" "):
+        #for word in line.split(" "):
+            words[word]+=1
+    print(len(words))
+
+    count=0
+    patterns=defaultdict(lambda: defaultdict(lambda: {"f":0}))
+    for word,f in list(words.items()):
+        if not hashes.get(stateAppend(0,word),0):
+            count+=1
+            #print(word , end="|")
+            parts=[word]
+            while len(word)>3:
+                parts.append(word[:3])
+                word=word[3:]
+            parts.append(word)
+            for part in parts:
+                h=stateAppend(0,part)
+                patterns[h][h]["f"]+=f
+    
+    print(f"{count}/{len(words)} are not found")
+                
+    print(f"patterns before dedup: {sum(len(d) for d in patterns.values())}")
+    for h,d in list(patterns.items()):
+        for sh,d2 in list(d.items()):
+            if h in hashes:
+                if sh in hashes[h]:
+                    del patterns[h][sh]
+    print(f"patterns after dedup: {sum(len(d) for d in patterns.values())}")
 
     hashCount=0
-    itterations=2
+    for h,d in list(patterns.items()):
+        for sh,d2 in list(d.items()):
+            if h not in hashes:
+                hashes[h]={}
+            if sh not in hashes[h]:
+                hashes[h][sh]=d2
+                hashCount+=1
+    print(f"hashes has {hashCount} new entries")
+    filename="pinru"
+    #filename="hashish"
+    #filename="quran"
+    with open(f"{filename}.pkl", "wb") as f:
+        pickle.dump(hashes, f)
+    with open(f"{filename}.json", "w") as f:
+        json.dump(hashes, f, indent=2)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+else:
+
+    hashCount=0
+    itterations=8
     l=0
     for i in range(itterations-1,-1,-1):
         start=time.perf_counter()
@@ -56,7 +138,7 @@ if __name__=="__main__":
             count+=1
             if not count%2000:
                 percentage=100*count//total
-                print(f"{count} out of {total} ({percentage}%), time left: {(time.time()-start)*(len(sentences)-count)/len(sentences)}"+" "*53)
+                print(f"{count} out of {total} ({percentage}%), time: {time.perf_counter()-start}"+" "*53)
             DAG=initialiseDAG(sentence)
             DAG=expandDAG(DAG,hashes,expand=True,expRound=itterations-i)
             #for h,d in extractPatterns(DAG,r=itterations-1,raw=True).items():
@@ -86,8 +168,8 @@ if __name__=="__main__":
         print(f"patterns after dedup: {sum(len(d) for d in patterns.values())}")
 
         freqs=patternFreqs(patterns)
-        threshold = np.percentile(freqs, 80*(itterations-i)/itterations)
-        patterns=freqFilter(patterns,lambda f: f>(max(2,threshold)))
+        threshold = np.percentile(freqs, 80)
+        patterns=freqFilter(patterns,lambda f: f>(max(3,threshold)))
         print(f"patterns after cull: {sum(len(d) for d in patterns.values())}")
         #for h,d in list(patterns.items())[5:]:
         #    for sh,d2 in list(d.items())[:2]:
@@ -102,8 +184,8 @@ if __name__=="__main__":
                     hashCount+=1
         print(f"hashes has {hashCount} entries")
     
-        filename="pinru"
-        #filename="hashish"
+        #filename="pinru"
+        filename="hashish"
         #filename="quran"
         with open(f"{filename}.pkl", "wb") as f:
             pickle.dump(hashes, f)
