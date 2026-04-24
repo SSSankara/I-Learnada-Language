@@ -49,8 +49,9 @@ def create_db(path):
         learner_id INTEGER NOT NULL REFERENCES learners(learner_id),
         sentence_id INTEGER NOT NULL REFERENCES sentences(sentence_id),
         stability   REAL NOT NULL DEFAULT 0.1,
-        activation  REAL NOT NULL DEFAULT 0.1,
+        last_event_activation  REAL NOT NULL DEFAULT 0.1,
         last_event_time REAL NOT NULL,
+        sentence_status  TEXT NOT NULL CHECK(status IN ('known', 'border', 'review')),
         session_id  INTEGER,
         PRIMARY KEY (learner_id, sentence_id)
     );
