@@ -18,7 +18,8 @@ def create_db(path):
     conn.executescript("""
     CREATE TABLE IF NOT EXISTS sentences (
         sentence_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        text    TEXT NOT NULL UNIQUE
+        text    TEXT NOT NULL UNIQUE,
+        density     REAL
     );
     CREATE TABLE IF NOT EXISTS patterns (
         pattern_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,7 +52,7 @@ def create_db(path):
         stability   REAL NOT NULL DEFAULT 0.1,
         last_event_activation  REAL NOT NULL DEFAULT 0.1,
         last_event_time REAL NOT NULL,
-        sentence_status  TEXT NOT NULL CHECK(status IN ('known', 'border', 'review')),
+        sentence_status  TEXT NOT NULL CHECK(sentence_status IN ('known', 'border', 'review')),
         session_id  INTEGER,
         PRIMARY KEY (learner_id, sentence_id)
     );
@@ -67,8 +68,12 @@ def create_db(path):
         ON sentences_patterns(pattern_id);
     CREATE INDEX IF NOT EXISTS idx_knn_sentence
         ON knn_edges(sentence_id);
+    CREATE INDEX IF NOT EXISTS idx_knn_neighbour
+        ON knn_edges(neighbour_id);
     CREATE INDEX IF NOT EXISTS idx_ls_learner
         ON learner_state(learner_id);
+    CREATE INDEX IF NOT EXISTS idx_learner_state_main
+        ON learner_state(learner_id, sentence_id, sentence_status);
     """)
     conn.commit()
     return(conn)
@@ -95,7 +100,8 @@ if __name__=="__main__":
     #    corpus=f.readlines()
     #with open("quran.pkl","rb") as f:
     #    hashes=pickle.load(f)
-    conn = create_db("../../data/pin2.db")
+    dbname="pinru"
+    conn = create_db(f"../../data/{dbname}.db")
     cur=conn.cursor()
 
     start=time.time()
@@ -114,7 +120,7 @@ if __name__=="__main__":
         DAG=expandDAG(DAG,hashes,expand=False)
         count+=1
         colsize = shutil.get_terminal_size().columns
-        print(f"{count}/{length}, {timeleft(start,count,length):.0f}s remaining, {sentence.replace("\n","")}{" "*50}"[:colsize-2],end="\r",flush=True)
+        print(f"{count}/{length}, {timeleft(start,count,length):.0f}s remaining, {sentence.replace("\n","")}"[:colsize-2],end="\r",flush=True)
         for k,d in DAG.items():
             h=hash2blob(k)
             for k2,d2 in d.items():
@@ -182,6 +188,7 @@ if __name__=="__main__":
     length=len(sentence_patterns)
     count=0
     start=time.time()
+    density=defaultdict(lambda:0)
     for sid, patterns in sentence_patterns.items():
         count+=1
         colsize = shutil.get_terminal_size().columns
@@ -197,14 +204,31 @@ if __name__=="__main__":
      
             if sim >= 0.05:
                 edges.append((sid, nid, sim))
+            density[sid]+=sim
      
-    print("inserting similarities")
     with conn:
+        print("inserting similarities")
         conn.executemany("""
             INSERT OR REPLACE INTO knn_edges (sentence_id, neighbour_id, similarity)
             VALUES (?, ?, ?)
         """, edges)
+        print("inserting sentence densities")
+        conn.executemany(
+            "UPDATE sentences SET density = ? WHERE sentence_id = ?",
+            [(d, sid) for sid, d in density.items()]
+        )
      
+    print("building knn cache...")
+    rows = conn.execute(
+        "SELECT sentence_id, neighbour_id, similarity FROM knn_edges"
+    ).fetchall()
+    knn_cache=defaultdict(list)
+    for sid, nid, sim in rows:
+        knn_cache[sid].append((nid, sim))
+    with open(f"../../cache/{dbname}.pickle", "wb") as f:
+        pickle.dump(dict(knn_cache), f)
+    print("knn cache saved.")
+
     print(f"Done. {len(edges):,} edges written.")
 
 

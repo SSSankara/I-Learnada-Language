@@ -31,7 +31,8 @@ def login():
                 break
             print("please enter y or n")
     
-    print(f"Welcome, {userName}")
-    learner_id = cur.execute("SELECT learner_id FROM learners WHERE name = ?", (userName,)).fetchone()
-    return(conn,learner_id)
+    learner_id = cur.execute("SELECT learner_id FROM learners WHERE name = ?", (userName,)).fetchone()[0]
+    print(f"Welcome, {userName}! ({learner_id})")
+    print("="*20)
+    return(dbPath,learner_id)
 
