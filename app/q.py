@@ -46,7 +46,7 @@ class Queue:
             if state.get("sentence_status") == "border":
 #                for nid,sim in getNeighbours(self.conn,sid):
                 k,b=0,0 
-                for nid,sim in self.knn_cache[sid]:
+                for nid,sim in self.knn_cache.get(sid,[]):
                     if st.get(nid,0):
                         if st[nid]["sentence_status"] == "known":
                             k+=st[nid]["stability"]*sim
@@ -58,6 +58,7 @@ class Queue:
         print("└─sorting sentences")
 
         #calculate ratio
+        self.known.sort(key=lambda x: x[0])
         for item in self.known:
             if item[0]>self.rt:
                 break
@@ -82,8 +83,8 @@ class Queue:
     def answer(self,sid,passed):
         self.was_correct=passed
         if passed:
-            for pid in conn.execute("SELECT pid FROM sentences_patterns WHERE sentence_id = ?",(sid,)):
-                seenPatterns.add(pid[0])
+            for pid in self.conn.execute("SELECT pattern_id FROM sentences_patterns WHERE sentence_id = ?",(sid,)):
+                self.seenPatterns.add(pid[0])
     
     def package(self,sid):
         text=self.conn.execute("""
@@ -93,7 +94,7 @@ class Queue:
         return(sid,text)
 
     def bestUnknown(self):
-        return self.conn.execute("""
+        row=self.conn.execute("""
             SELECT s.sentence_id, s.text, s.density
             FROM sentences s
             WHERE s.sentence_id NOT IN (
@@ -101,21 +102,34 @@ class Queue:
             )
             ORDER BY s.density DESC
             LIMIT 1
-        """, (self.lid,)).fetchone()[0]
+        """, (self.lid,)).fetchone()
+        return row[0] if row else None
 
+    def finishSession(self):
+        if self.revise:
+            print("relearning:")
+            sid=heapq.heappop(self.revise)[1]
+            return(self.package(sid))
+        print("session over. Leave now or continue for 5 new cards and a bunch of extra reviews")
+        print("="*20)
+        self.nn=5
+        self.rt=1
+        self.updateKnown()
     def next(self):
+        print(f"seenPatterns: {len(self.seenPatterns)}")
         #if self.start:
         #    out=self.package(self.start)
         #    self.start=0
         #    return(out)#first sentence,
 
-        if not self.nn and not self.nk:
-            print("session over. Leave now or continue for 5 new cards and a bunch of extra reviews")
-            self.nn=5
-            self.rt=1
-            self.updateKnown()
+        if self.nn<=0 and self.nk<=0:
+            result=self.finishSession()
+            if result: return result
 
-        if not self.border: return(self.package(self.bestUnknown()))
+        if not self.border:
+            bid=self.bestUnknown()
+            if bid is None: return None
+            return self.package(bid)
 
         if not (self.was_new and self.was_correct): #skip all this and go straight to the next new card
             self.was_new=False
@@ -130,7 +144,15 @@ class Queue:
 
             self.updateKnown()
             if self.nn<0:self.nn=0
-            if random.choices([True, False], weights=[math.log(self.nk+1), math.log(self.nn+1)])[0]:
+            if self.nk<0:self.nk=0
+            print(f"nk:{self.nk},nn:{self.nn}")
+            if self.nk==0:
+                do_review=False
+            elif self.nn==0:
+                do_review=True
+            else:
+                do_review=random.choices([True,False],weights=[math.log(self.nk+1),math.log(self.nn+1)])[0]
+            if do_review:
                 #review
                 print("reviewing:")
                 sid=heapq.heappop(self.known)[1]
@@ -139,20 +161,23 @@ class Queue:
         else:
             self.nn+=1
         print(f"new sentence: ({self.nn} remaining)")
+        self.was_new=True
         self.nn-=1
         sid=heapq.heappop(self.border)[1]
-        patterns=conn.execute("SELECT pid FROM sentences_patterns WHERE sentence_id = ?",(sid,)
-        while any(neighbour[0] in self.wronglist for neighbour in self.knn_cache[sid]) or any(pid[0] in self.seenPatterns for pid in patterns):
-            if not self.border: return(self.package(self.bestUnknown()))
+        patterns=[pid[0] for pid in self.conn.execute("SELECT pattern_id FROM sentences_patterns WHERE sentence_id = ?",(sid,))]
+        while any(neighbour[0] in self.wronglist for neighbour in self.knn_cache.get(sid,[])) or all(pid in self.seenPatterns for pid in patterns):
+            if not self.border:
+                bid=self.bestUnknown()
+                if bid is None: return None
+                return self.package(bid)
             sid=heapq.heappop(self.border)[1]
-            patterns=conn.execute("SELECT pid FROM sentences_patterns WHERE sentence_id = ?",(sid,)
-        self.was_new=True
+            patterns=[pid[0] for pid in self.conn.execute("SELECT pattern_id FROM sentences_patterns WHERE sentence_id = ?",(sid,))]
         return(self.package(sid))
 
     def addBorder(self,sid):
         st=self.state
-        k,b=0,0 
-        for nid,sim in self.knn_cache[sid]:
+        k,b=0,0
+        for nid,sim in self.knn_cache.get(sid,[]):
             if st.get(nid,0):
                 if st[nid]["sentence_status"] == "known":
                     k+=st[nid]["stability"]*sim
@@ -166,7 +191,7 @@ class Queue:
         items=self.state[sid]
         self.nk+=1
         r = decay(items["last_event_time"], items["stability"], items["last_event_activation"])
-        heapq.heappush(self.border, (r, sid))
+        heapq.heappush(self.known, (r, sid))
 
     def addRevise(self,sid):
         self.wronglist.add(sid)

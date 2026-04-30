@@ -10,9 +10,10 @@ def login():
     while True:
         try:
             answer=int(input("enter number:"))
+            if not 0<=answer<len(files): raise IndexError
             dbPath=f"../data/{files[answer]}"
             break
-        except:
+        except (ValueError, IndexError):
             continue
     print(dbPath)
     conn = sqlite3.connect(dbPath)
