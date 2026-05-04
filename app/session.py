@@ -19,6 +19,7 @@ TAU_MAX=100*365*86400 #maximum decay constant - 100 years to decay to 1/e retrie
 TAU_MIN=86400 #1 day to decay to 1/e retrievability
 REVIEW_RET_THRESHOLD=0.9
 NEW_PER_SESSION=10
+MIN_SENTENCE_LEN=5
 REWARD=0.2 #of the distance between stability and 1
 PENALTY=0.4 #loss to the stability afterwards, these are subject to change
 DEFAULT_STABILITY=((-86400/math.log(REVIEW_RET_THRESHOLD))-TAU_MIN)/(TAU_MAX-TAU_MIN)#passes review threshold in 24 hours
@@ -263,7 +264,7 @@ def runSession(db_path,lid):
     
     default_sid=2065#你好
     global queue
-    queue=Queue(conn,lid,REVIEW_RET_THRESHOLD,NEW_PER_SESSION,learner_state_dict,default_sid,knn_cache)
+    queue=Queue(conn,lid,REVIEW_RET_THRESHOLD,NEW_PER_SESSION,learner_state_dict,default_sid,knn_cache,MIN_SENTENCE_LEN)
     grade=""
     while grade!="e":
         sid,text=queue.next()

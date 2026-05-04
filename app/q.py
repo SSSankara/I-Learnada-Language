@@ -4,10 +4,12 @@ import random
 import math
 import heapq
 
+MIN_LEN=5
+
 #note: this file is called q.py rather than the more profesisonal queue.py because that would conflict with the translation library
 
 class Queue:
-    def __init__(self,conn,lid,review_threshold,num_news,learner_state_dict,start,knn_cache=None):
+    def __init__(self,conn,lid,review_threshold,num_news,learner_state_dict,start,knn_cache=None,min_len=MIN_LEN):
         self.conn=conn
         self.lid=lid
         self.rt=review_threshold
@@ -23,6 +25,7 @@ class Queue:
         self.seenPatterns=set()
         heapq.heapify(self.revise)
         self.wronglist=set()
+        self.min_len=min_len
         self.was_new=False# if a new sentence is known, give another new sentence
         self.was_correct=False
         self.start=start
@@ -82,9 +85,8 @@ class Queue:
 
     def answer(self,sid,passed):
         self.was_correct=passed
-        if passed:
-            for pid in self.conn.execute("SELECT pattern_id FROM sentences_patterns WHERE sentence_id = ?",(sid,)):
-                self.seenPatterns.add(pid[0])
+        for pid in self.conn.execute("SELECT pattern_id FROM sentences_patterns WHERE sentence_id = ?",(sid,)):
+            self.seenPatterns.add(pid[0])
     
     def package(self,sid):
         text=self.conn.execute("""
@@ -93,6 +95,9 @@ class Queue:
         LIMIT 1;""",(sid,)).fetchone()[0]
         return(sid,text)
 
+    def _textlen(self,sid):
+        return self.conn.execute("SELECT length(text) FROM sentences WHERE sentence_id=?",(sid,)).fetchone()[0]
+
     def bestUnknown(self):
         row=self.conn.execute("""
             SELECT s.sentence_id, s.text, s.density
@@ -100,9 +105,10 @@ class Queue:
             WHERE s.sentence_id NOT IN (
                 SELECT sentence_id FROM learner_state WHERE learner_id = ?
             )
+            AND length(s.text) >= ?
             ORDER BY s.density DESC
             LIMIT 1
-        """, (self.lid,)).fetchone()
+        """, (self.lid,self.min_len)).fetchone()
         return row[0] if row else None
 
     def finishSession(self):
@@ -128,6 +134,9 @@ class Queue:
 
         if not self.border:
             bid=self.bestUnknown()
+            while bid is None and self.min_len>1:
+                self.min_len-=1
+                bid=self.bestUnknown()
             if bid is None: return None
             return self.package(bid)
 
@@ -160,14 +169,17 @@ class Queue:
                 return(self.package(sid))
         else:
             self.nn+=1
-        print(f"new sentence: ({self.nn} remaining)")
         self.was_new=True
         self.nn-=1
+        print(f"new sentence: ({self.nn} remaining)")
         sid=heapq.heappop(self.border)[1]
         patterns=[pid[0] for pid in self.conn.execute("SELECT pattern_id FROM sentences_patterns WHERE sentence_id = ?",(sid,))]
-        while any(neighbour[0] in self.wronglist for neighbour in self.knn_cache.get(sid,[])) or all(pid in self.seenPatterns for pid in patterns):
+        while self._textlen(sid)<self.min_len or any(neighbour[0] in self.wronglist for neighbour in self.knn_cache.get(sid,[])) or all(pid in self.seenPatterns for pid in patterns):
             if not self.border:
                 bid=self.bestUnknown()
+                while bid is None and self.min_len>1:
+                    self.min_len-=1
+                    bid=self.bestUnknown()
                 if bid is None: return None
                 return self.package(bid)
             sid=heapq.heappop(self.border)[1]

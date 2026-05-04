@@ -43,28 +43,32 @@ if __name__=="__main__":
     itterations=2
     l=0
     for i in range(itterations-1,-1,-1):
-        start=time.perf_counter()
+        start=time.time()
         print(f"======== round {itterations - i}/{itterations} ========")
         #patterns=defaultdict(lambda: defaultdict(lambda: {"f":0,"raw":""}))
         patterns=defaultdict(lambda: defaultdict(lambda: {"f":0}))
         count=0
         total=len(corpus)
         for sentence in corpus:
-            print(" "*120,end="\r")
-            print(" "*50+sentence[:min(len(sentence)-1,80)]+" "+str(count),end="\r")
+            #print(" "*120,end="\r")
+            #print(" "*50+sentence[:min(len(sentence)-1,80)]+" "+str(count),end="\r")
             
             count+=1
             if not count%2000:
                 percentage=100*count//total
-                print(f"{count} out of {total} ({percentage}%), time left: {(time.time()-start)*(len(sentences)-count)/len(sentences)}"+" "*53)
+                print(f"{count} out of {total} ({percentage}%), time left: ~{(time.time()-start)*(len(corpus)-count)/count:.0f}s"+" "*52,end="\r")
             DAG=initialiseDAG(sentence)
             DAG=expandDAG(DAG,hashes,expand=True,expRound=itterations-i)
             #for h,d in extractPatterns(DAG,r=itterations-1,raw=True).items():
             for h,d in DAG.items():
+                if h==0:
+                    continue
                 for location,d2 in d.items():
                     if d2["masked"]:
                         continue
                     sh=d2["sh"]
+                    if sh==0:
+                        continue
                     #patterns[h][sh]["raw"]=d2["raw"]
                     if h==sh:
                         patterns[h][sh]["f"]+=1
@@ -72,7 +76,7 @@ if __name__=="__main__":
                         patterns[h][sh]["f"]+=0.1
         
         print(" "*100,end="\r")
-        end=time.perf_counter()
+        end=time.time()
         print(f"took {end - start} seconds")
         print("filtering and updating")
         #patterns={k:d for k,d in patterns.items() if k not in hashes}

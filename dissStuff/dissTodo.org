@@ -1,13 +1,13 @@
 #+title: Dissertation
 * project outline and spec
 * Title
-core cs problem being solved. Expansion
+- [X] core cs problem being solved. Expansion
 Spatially Propagated Spaced Repetition over a Linguistic Similarity Graph for Language Learning
 * summary
 - one page
-- Concise statement of the problem you intended to solve and main achievements
+- [ ] Concise statement of the problem you intended to solve and main achievements
 * Acknowledgements
-- THIS page should contain any acknowledgements to those who have assisted with your work.
+- [ ] THIS page should contain any acknowledgements to those who have assisted with your work.
 * table of contents
 * 1 Introduciton and background research
 - [ ] Project aim and context explained at a level suitable for non experts.

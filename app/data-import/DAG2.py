@@ -13,7 +13,7 @@ def initialiseDAG(sentence):
     DAG=defaultdict(lambda: defaultdict(lambda: {"links":[],"mask":1,"round":0, "length":0,"raw":["",[0,0]],"masked":False}))
     sentenceHashes=[[[char,[stateAppend(0,char),1]]] for char in sentence] #added garbage space so all characters are added to DAG
     sentenceHashes.append([["",[0,0]]])
-    DAG[0]={-1:{"links":[[sentenceHashes[0][0][1][0],0]],"mask":0,"round":0,"length":0,"raw":[["",[0,0]]],"masked":False},len(sentence):{"links":[],"mask":1, "round":0, "length":0,"raw":[["",[0,0]]],"masked":False}} #start and end
+    DAG[0]={-1:{"links":[[sentenceHashes[0][0][1][0],0]],"mask":0,"round":0,"length":0,"raw":["",[0,0]],"masked":False},len(sentence):{"links":[],"mask":1, "round":0, "length":0,"raw":["",[0,0]],"masked":False}} #start and end
     i=0
     for i in range(len(sentenceHashes)-1):
         DAG[sentenceHashes[i][0][1][0]][i]={"links":[[sentenceHashes[i+1][0][1][0],i+1]],"mask":1,"round":0,"length":1,"raw":sentenceHashes[i],"masked":False}
@@ -101,7 +101,9 @@ def generateChains(DAG, n, itteration, loop, fucklist, references=None , start=N
 
     #print(chain)
     for link in DAG[start[0]][start[1]]["links"]:
-        yield from generateChains(DAG, n-1, itteration, loop, fucklist, references=references, start=link, chain=chain, new=new, first=False)
+        node = DAG.get(link[0], {}).get(link[1])
+        if node is not None:
+            yield from generateChains(DAG, n-1, itteration, loop, fucklist, references=references, start=link, chain=chain, new=new, first=False)
 
 
 def expandDAG(DAG,hashes,expand=True,expRound=-420): #where round refers to which hashes you want to make patterns out of
@@ -147,6 +149,8 @@ def expandDAG(DAG,hashes,expand=True,expRound=-420): #where round refers to whic
                 newmask=1
                 maskedNodes=[]
                 chainHash,length=cachedStateCombine(tuple((chain[index][0],references[index]["length"]) for index in indices))
+                if chainHash==0:
+                    continue
                 fuckKey = chainHash ^ (chain[0][1] << 5) ^ mask
                 if fuckKey in fucklist and loop>1:
                     continue
@@ -186,6 +190,8 @@ def expandDAG(DAG,hashes,expand=True,expRound=-420): #where round refers to whic
 
                 # make sure there are new nodes in the chain
                 if (DAGexplored and loop > 1): #or hashexplored:
+                    continue
+                if rawlist==[[]]:
                     continue
 
                 raw=[rawfunction(raws) for raws in rawlist]
@@ -270,6 +276,7 @@ def expandDAG(DAG,hashes,expand=True,expRound=-420): #where round refers to whic
             sources=[]#keep track of where each chain came from for relinking into DAG
         loop-=1
 
+
     if expand:
         return(DAGcandidates)
     for key,d in DAGcandidates.items():
@@ -291,6 +298,8 @@ def extractPatterns(DAG,r=-1,raw=False):
         if key!=0:
             for location, d2 in d.items():
                 subhash=sum([part[1][0] for part in d2["raw"]])
+                if subhash == 0:
+                    continue
                 if d2["masked"]:
                     continue
                 patterns[key][subhash]["f"]+=1
@@ -316,6 +325,7 @@ if __name__=="__main__":
     DAG=expandDAG(DAG,hashes,expand=True)
     #print(json.dumps(DAG, indent=2))
     patterns=defaultdict(lambda: defaultdict(lambda: {"f":0}))
+    extractPatterns(DAG)
 
     print("extracting patterns")
     for h,d in DAG.items():
@@ -332,16 +342,16 @@ if __name__=="__main__":
     with open("patterns.json","w") as f:
         json.dump(patterns, f, indent=2)
     
-    from line_profiler import LineProfiler
+    #from line_profiler import LineProfiler
 
-    lp = LineProfiler()
-    lp.add_function(expandDAG)
-    DAG=initialiseDAG(sentence)
-    
-    lp.run('expandDAG(DAG, hashes, expand=True)')
-    lp.print_stats()
-    #lp.add_function(extractPatterns)
-    #lp.run('extractPatterns(DAG, raw=True)')
-    lp.print_stats()
+    #lp = LineProfiler()
+    #lp.add_function(expandDAG)
+    #DAG=initialiseDAG(sentence)
+    #
+    #lp.run('expandDAG(DAG, hashes, expand=True)')
+    #lp.print_stats()
+    ##lp.add_function(extractPatterns)
+    ##lp.run('extractPatterns(DAG, raw=True)')
+    #lp.print_stats()
     #print(json.dumps(patterns, indent=2))
     print(f"no patterns: {len(patterns)}")
