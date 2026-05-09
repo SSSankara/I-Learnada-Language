@@ -1,0 +1,19 @@
+======== round preliminary round/1 ========
+2000 out of 6236 (32%), time left: ~4s                                                    4000 out of 6236 (64%), time left: ~1s                                                    6000 out of 6236 (96%), time left: ~0s                                                    hashes has 71 entries
+Seconds: 3.3257267475128174
+======== round 1/1 ========
+2000 out of 6236 (32%), time left: ~150s                                                    4000 out of 6236 (64%), time left: ~65s                                                    6000 out of 6236 (96%), time left: ~6s                                                                                                                                                        took 151.63571190834045 seconds
+filtering and updating
+patterns before dedup: 8227
+patterns after dedup: 8227
+there are 8227 patterns
+patterns after cull: 1233
+hashes has 1304 entries
+Seconds: 155.00847792625427
+total words:19549
+words where f=1 :12481 (63.84%)
+words where f=2 :2955 (15.12%)
+19522/19549 are not found
+patterns before dedup: 23215
+patterns after dedup: 22482
+hashes has 22482 new entries

@@ -34,24 +34,33 @@ def freqFilter(patterns,boolFunction):
 if __name__=="__main__":
     with open("../../assets/pinru/subs","r") as f:
         corpus=f.readlines()
-    with open("pinru.pkl","rb") as f:
-        hashes=pickle.load(f)
+    #with open("pinru.pkl","rb") as f:
+    #    hashes=pickle.load(f)
     #with open("../../assets/eng_newscrawl_2018_10K/eng_newscrawl_2018_10K-sentences.txt","r") as f:
     #   corpus=[line.split('\t')[1] for line in f.readlines()]
     #with open("hashish.pkl","rb") as f:
     #    hashes=pickle.load(f)
     #with open("../../assets/quran","r") as f:
-    #    corpus=f.readlines()
-    #with open("quran.pkl","rb") as f:
+    #    corpus=[line for line in f.readlines()]
+    #with open("quran-3-85.pkl","rb") as f:
     #    hashes=pickle.load(f)
     #hashes=defaultdict(lambda: defaultdict(lambda: {"f":0,"raw":""}))
-    #hashes={}
+    hashes={}
     words=defaultdict(lambda: 0)
     for line in corpus:
-        for word in jieba.cut(line):#.split(" "):
+        for word in [c for c in jieba.cut_for_search(line)]+[c for c in line]:#.split(" "):
         #for word in line.split(" "):
             words[word]+=1
-    print(len(words))
+    den,num1,num2=0,0,0
+    for word in words:
+        den+=1
+        if words[word]==1:
+            num1+=1
+        if words[word]==2:
+            num2+=1
+    print(f"total words:{den}")
+    print(f"words where f=1 :{num1} ({100*num1/den:.2f}%)")
+    print(f"words where f=2 :{num2} ({100*num2/den:.2f}%)")
 
     count=0
     patterns=defaultdict(lambda: defaultdict(lambda: {"f":0}))
@@ -87,9 +96,9 @@ if __name__=="__main__":
                 hashes[h][sh]=d2
                 hashCount+=1
     print(f"hashes has {hashCount} new entries")
-    filename="pinru"
+    filename="pinru_wordsAlone"
     #filename="hashish"
-    #filename="quran"
+    #filename="quran-3-85-w"
     with open(f"{filename}.pkl", "wb") as f:
         pickle.dump(hashes, f)
     with open(f"{filename}.json", "w") as f:
@@ -185,10 +194,10 @@ else:
         print(f"hashes has {hashCount} entries")
     
         #filename="pinru"
-        filename="hashish"
-        #filename="quran"
-        with open(f"{filename}.pkl", "wb") as f:
-            pickle.dump(hashes, f)
-        with open(f"{filename}.json", "w") as f:
-            json.dump(hashes, f, indent=2)
+        #filename="hashish"
+        #"quran-3-90"
+        #with open(f"{filename}.pkl", "wb") as f:
+        #    pickle.dump(hashes, f)
+        #with open(f"{filename}.json", "w") as f:
+        #    json.dump(hashes, f, indent=2)
 

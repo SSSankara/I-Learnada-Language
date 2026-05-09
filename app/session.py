@@ -15,17 +15,34 @@ import tempfile
 import readchar
 
 MIN_IDF=0.3
-TAU_MAX=100*365*86400 #maximum decay constant - 100 years to decay to 1/e retrievability
+CASCADE_THRESHOLD=1 #not every pattern (there are absolutely some garbage patterns). eg most distinctive 85% of vocab weight
+TAU_MAX=10*365*86400 #maximum decay constant - 10 years to decay to 1/e retrievability
 TAU_MIN=86400 #1 day to decay to 1/e retrievability
 REVIEW_RET_THRESHOLD=0.9
 NEW_PER_SESSION=10
 MIN_SENTENCE_LEN=5
-REWARD=0.2 #of the distance between stability and 1
-PENALTY=0.4 #loss to the stability afterwards, these are subject to change
-DEFAULT_STABILITY=((-86400/math.log(REVIEW_RET_THRESHOLD))-TAU_MIN)/(TAU_MAX-TAU_MIN)#passes review threshold in 24 hours
-
+REWARD=0.052  # first review at threshold: 1-day interval → ~3 days
+PENALTY=0.104 # twice reward
+DEFAULT_STABILITY=((-TAU_MIN/math.log(REVIEW_RET_THRESHOLD))-TAU_MIN)/(TAU_MAX-TAU_MIN)#passes review threshold in time for TAU_MIN
+                                                                                       #to reach 1/e
 knn_cache=defaultdict(list)#for quick sentence edge lookups
+sp_dict={}                 #sentence->{pattern_id:idf}
+_verbose=True
 global queue
+
+def loadPatterns(conn):
+    global sp_dict
+    if sp_dict: return
+    print("├─loading patterns...")
+    tmp=defaultdict(dict)
+    for sid,pid,idf in conn.execute("""
+        SELECT sp.sentence_id, sp.pattern_id, p.idf_score
+        FROM sentences_patterns sp
+        JOIN patterns p ON p.pattern_id=sp.pattern_id
+        WHERE p.idf_score>=?
+    """, (MIN_IDF,)):
+        tmp[sid][pid]=idf
+    sp_dict=dict(tmp)
 
 def loadCache(conn,cache_path):
     global knn_cache
@@ -46,7 +63,7 @@ def loadCache(conn,cache_path):
 
 def loadSession(conn,learner_id):
     rows=conn.execute("""
-        SELECT sentence_id,stability,last_event_activation, last_event_time, sentence_status 
+        SELECT sentence_id,stability,last_event_activation, last_event_time, sentence_status
         FROM learner_state WHERE learner_id = ?
     """, (learner_id,)).fetchall()
     learner_state_dict={sid:{"stability": s, "last_event_activation": a, "last_event_time":t, "sentence_status":stat} for sid,s,a,t,stat in rows}
@@ -102,120 +119,113 @@ def setStatus(conn,lid,sid,session_id,learner_state_dict,status):
 
 def cascadeKnown(conn,lid,sid,session_id,learner_state_dict):
     global queue
-    cascadeQueue=[sid]
-    visited=set()
-    #all unknown neighbours and their patterns
-    count=-1
-    query="""
-    WITH required AS ( 
-    	SELECT DISTINCT k.neighbour_id AS nid, sp.pattern_id FROM knn_edges k
-        JOIN learner_state x ON x.sentence_id=k.sentence_id
-        JOIN sentences_patterns sp ON sp.sentence_id=k.neighbour_id
-        WHERE  x.sentence_id=?
-        AND NOT EXISTS (
-            SELECT 1
-            FROM learner_state y
-            WHERE y.sentence_id=k.neighbour_id
-            AND y.learner_id=?
-            AND y.sentence_status='known'
-        )
-    ),
-        available AS (
-            SELECT r.nid, r.pattern_id,
-            MAX(ls.stability)       AS stability,
-            MAX(ls.last_event_time) AS last_event_time
-        FROM required r
-        JOIN knn_edges k2 ON k2.neighbour_id = r.nid
-        JOIN learner_state ls ON ls.sentence_id = k2.sentence_id
-            AND ls.learner_id = ?
-            AND ls.sentence_status = 'known'
-        JOIN sentences_patterns sp2 ON sp2.sentence_id = k2.sentence_id
-            AND sp2.pattern_id = r.pattern_id
-        GROUP BY r.nid, r.pattern_id
-    )
-    SELECT r.nid,
-        COUNT(a.pattern_id) AS matched_count,
-        COUNT(r.pattern_id) AS required_count,
-        MIN(a.stability) AS newS, 
-        MIN(a.last_event_time) AS newT
-    FROM required r
-    LEFT JOIN available a
-    ON r.nid=a.nid
-    AND r.pattern_id = a.pattern_id
-    GROUP BY r.nid
-    """
+    #queue.addKnown(sid)
+    getNeighbours(conn,sid)
+    cascadeQueue={nid for nid,_ in knn_cache.get(sid,[])}
+    count=0
+    now=time.time()
 
     while cascadeQueue:
-        print(f"{'.'*(count%3+1)}   ",end="\r")
-        sid=cascadeQueue.pop()
-        queue.addKnown(sid)
-        
-        if sid in visited:
-            continue
-        #cache the neighbours of the sentence
-        getNeighbours(conn,sid)
-        count+=1
-        visited.add(sid)
-        setStatus(conn,lid,sid,session_id,learner_state_dict,"known")
-        throws=conn.execute(query,(sid,lid,lid,))
-        batch=[]
-        for nid,matched_count,required_count,s,t in list(throws):
-            isKnown = (matched_count==required_count)
-            if s is None:
-                s=0
-                t=time.time()
-            if isKnown:
-                a=decay(t,s)
-                stat="known"
-            else:
-                a=0
-                stat="border"
-            batch.append((lid,nid,s,a,t,stat,session_id))
+        if _verbose:
+            print(f"{'.'*(count%3+1)}   ",end="\r")
+        nid=cascadeQueue.pop()
+        if learner_state_dict.get(nid,{}).get("sentence_status")=="known": continue
 
-            learner_state_dict[nid]={"stability": s, "last_event_activation": a, "last_event_time": t, "sentence_status":stat}
-            if isKnown:
-                cascadeQueue.append(nid)
+        req=sp_dict.get(nid,{})
+        best={}  # pattern_id -> (stability, sim, kn) — used only for stability
+        getNeighbours(conn,nid)
+
+        known_idf = 0
+
+        for kn,sim in knn_cache.get(nid,[]):
+            kst=learner_state_dict.get(kn)
+            status=""
+            if not kst: status="unknown"
+            else: status=kst["sentence_status"]
+            for pid in sp_dict.get(kn,{}):
+                if status=="known": 
+                    if pid not in best or kst["stability"]>best[pid][0]:
+                        best[pid]=(kst["stability"],sim,kn)
+
         
-        conn.executemany("""
+        total_idf = sum(req.values())
+        known_idf = sum(idf for pid, idf in req.items() if pid in best)
+
+        isKnown = False
+        if total_idf > 0:
+            coverage = known_idf / total_idf
+            if coverage >= (CASCADE_THRESHOLD - 1e-9):
+                isKnown = True
+        if best:
+            unique={kn:(stab,sim) for stab,sim,kn in best.values()}
+            total_sim=sum(sim for _,sim in unique.values())
+            s=sum(sim*stab for stab,sim in unique.values())/total_sim if total_sim else 0
+        else:
+            s=DEFAULT_STABILITY
+        #if isKnown: s=coverage  # high stability → won't appear in SRS queue; maintained by neighbours' reviews
+        a=1 if isKnown else 0
+        stat="known" if isKnown else "border"
+
+        conn.execute("""
             INSERT INTO learner_state (
-                learner_id, sentence_id, stability, last_event_activation, 
+                learner_id, sentence_id, stability, last_event_activation,
                 last_event_time, sentence_status, session_id
-            ) 
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(learner_id, sentence_id) DO UPDATE SET
-                stability = excluded.stability,
-                last_event_activation = excluded.last_event_activation,
-                last_event_time = excluded.last_event_time,
-                sentence_status = excluded.sentence_status,
-                session_id = excluded.session_id;
-        """,batch
-        )
-    return(count)
+            )
+            VALUES (?,?,?,?,?,?,?)
+            ON CONFLICT(learner_id,sentence_id) DO UPDATE SET
+                stability=excluded.stability,
+                last_event_activation=excluded.last_event_activation,
+                last_event_time=excluded.last_event_time,
+                sentence_status=excluded.sentence_status,
+                session_id=excluded.session_id;
+        """,(lid,nid,s,a,now,stat,session_id))
+        learner_state_dict[nid]={"stability":s,"last_event_activation":a,"last_event_time":now,"sentence_status":stat}
+        if isKnown:
+            count+=1
+            #queue.addKnown(nid)
+            cascadeQueue.update(nnid for nnid,_ in knn_cache.get(nid,[])
+                                if learner_state_dict.get(nnid,{}).get("sentence_status")!="known")
+        # border: tracked in learner_state only — not pushed to queue.border so review phase can't serve them
 
-def updateSentence(conn,lid,sid,session_id,passed,learner_state_dict,similarity=1):
+    return count
+
+def updateSentence(conn,lid,sid,session_id,passed,learner_state_dict,similarity=None,factor=None):
         #similarity here is for neighbours
 
     global queue
-    if conn.execute("SELECT 1 FROM learner_state WHERE sentence_id=? AND learner_id=?", (sid, lid)).fetchone():
-        r,a,s,stat=retrievability(conn,lid,sid)
+    if sid in learner_state_dict:
+        state=learner_state_dict[sid]
+        a,s,stat=state["last_event_activation"],state["stability"],state["sentence_status"]
+        r=decay(state["last_event_time"],s,a)
     else:
         r,a,s,stat=1,1,DEFAULT_STABILITY,"border"
         queue.addBorder(sid)
+    
+
+    #just incase
+    s = max(0.0, min(1.0, s))
+    a = max(0.0, min(1.0, a))
+    r = max(0.0, min(1.0, r))
+
+    if factor is None: factor=r
 
     t=time.time()
     cascade=False
     if passed:
-        s=s+(1-s)*REWARD*(1-r)*similarity
-        a=min(1,max(r,1*similarity))
-        if similarity==1:
+        if similarity is None:
             if stat != "known":
                 cascade=True
                 stat="known"
+            similarity=1
+        s=s+(1-s)*(REWARD*0.5 if stat=="review" else REWARD)*(1-factor)*similarity
+        a=r+(1-r)*similarity
     else:
-        s-=s*PENALTY*r*similarity
-        if similarity==1:
+        if similarity is None:
             stat="review"
             queue.addRevise(sid)
+            similarity=1
+        s-=s*PENALTY*factor*similarity
+        a=r-r*similarity*(1-REVIEW_RET_THRESHOLD)
 
     conn.execute("""
         INSERT INTO learner_state (
@@ -234,9 +244,9 @@ def updateSentence(conn,lid,sid,session_id,passed,learner_state_dict,similarity=
     learner_state_dict[sid]={"stability": s, "last_event_activation": a, "last_event_time":t,"sentence_status":stat}
     if cascade:
         count=cascadeKnown(conn,lid,sid,session_id,learner_state_dict)
-        if count:
+        if count and _verbose:
             print(f"{count} extra sentence{"s"*(count>1)} learnt ^_^")
-    return(s,a,t,stat)
+    return r
 
 def getNeighbours(conn, sid):
     if not knn_cache.get(sid,0):
@@ -247,9 +257,11 @@ def getNeighbours(conn, sid):
     return knn_cache[sid]
 
 def propagate(conn,lid,sid,session_id,passed,learner_state_dict):
-    updateSentence(conn,lid,sid,session_id,passed,learner_state_dict)
+    was_new=sid not in learner_state_dict
+    factor=updateSentence(conn,lid,sid,session_id,passed,learner_state_dict)
+    if was_new: factor=DEFAULT_STABILITY  # r=1 for new sentences → (1-factor)=0, no propagation without this
     for nid,similarity in getNeighbours(conn,sid):
-        updateSentence(conn,lid,nid,session_id,passed,learner_state_dict,similarity)
+        updateSentence(conn,lid,nid,session_id,passed,learner_state_dict,similarity,factor)
 
 
 def runSession(db_path,lid):
@@ -260,14 +272,27 @@ def runSession(db_path,lid):
     print("├─loading cache...")
     cache_path=db_path.replace("data/","cache/").replace(".db",".pickle")
     loadCache(conn,cache_path)
+    loadPatterns(conn)
     session_id=0
     
     default_sid=2065#你好
     global queue
     queue=Queue(conn,lid,REVIEW_RET_THRESHOLD,NEW_PER_SESSION,learner_state_dict,default_sid,knn_cache,MIN_SENTENCE_LEN)
+    if not learner_state_dict:
+        for sid in queue.selectSeeds(conn):
+            queue.addBorder(sid)
     grade=""
     while grade!="e":
         sid,text=queue.next()
+        if sid==-1:
+            grade=""
+            while grade not in ("e","c"):
+                print("session over. Leave now (e) or continue (c) for 5 new cards and a bunch of extra reviews")
+                print("="*20)
+                grade=readchar.readchar().lower()
+            if grade=="e": break
+            sid,text=queue.next()
+
         print("  "+text)
         playAudio(text)
         grade=""

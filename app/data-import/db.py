@@ -56,11 +56,7 @@ def create_db(path):
         session_id  INTEGER,
         PRIMARY KEY (learner_id, sentence_id)
     );
-    CREATE TABLE IF NOT EXISTS sessions (
-        session_id  INTEGER PRIMARY KEY AUTOINCREMENT,
-        learner_id  INTEGER NOT NULL REFERENCES learners(learner_id),
-        started_at  REAL NOT NULL
-    );
+
 
     CREATE INDEX IF NOT EXISTS idx_sp_sentence
         ON sentences_patterns(sentence_id);
@@ -90,7 +86,7 @@ def timeleft(start, count, length):
 if __name__=="__main__":
     with open("../../assets/pinru/subs","r") as f:
         corpus=f.readlines()
-    with open("pinru.pkl","rb") as f:
+    with open("pinru_wordsAlone.pkl","rb") as f:
         hashes=pickle.load(f)
     #with open("../../assets/eng_newscrawl_/eng_newscrawl_2018_10K-sentences.txt","r") as f:
     #   corpus=[line.split('\t')[1] for line in f.readlines()]
@@ -100,7 +96,7 @@ if __name__=="__main__":
     #    corpus=f.readlines()
     #with open("quran.pkl","rb") as f:
     #    hashes=pickle.load(f)
-    dbname="pinru"
+    dbname="pinru_words_alone"
     conn = create_db(f"../../data/{dbname}.db")
     cur=conn.cursor()
 
